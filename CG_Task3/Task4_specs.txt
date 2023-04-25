@@ -1,0 +1,1 @@
+﻿> Clipping with convex/rectangle polygon
