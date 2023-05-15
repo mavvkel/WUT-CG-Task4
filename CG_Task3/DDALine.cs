@@ -1,22 +1,58 @@
-﻿using System;
-using System.Windows;
+﻿using System.Diagnostics;
+using System;
 using System.Collections.Generic;
-using System.Windows.Documents;
-using System.Security.Cryptography.Pkcs;
-using System.Windows.Input;
 using System.Linq;
+using System.Drawing;
+using Newtonsoft.Json;
 
 namespace CG_Task3
 {
 
     public class DDALine : I2DPrimitive
     {
-        private StylusPoint _startPoint;
-        private StylusPoint _endPoint;
-        private StylusPointCollection _handlePoints;
+        private System.Drawing.Point _startPoint;
+        private System.Drawing.Point _endPoint;
+        private List<System.Drawing.Point> _handlePoints;
+        private int _brushThickness;
 
-        public StylusPointCollection Pixels { get; private set; }
-        public StylusPoint StartPoint
+        #region Constructors
+
+        public DDALine(System.Drawing.Point startPoint, System.Drawing.Point endPoint)
+        {
+            _startPoint = startPoint;
+            _endPoint = endPoint;
+            _handlePoints = new()
+            {
+                _startPoint,
+                _endPoint
+            };
+            Pixels = CalculatePixels();
+            Color = System.Drawing.Color.Black;
+            BrushThickness = 1;
+        }
+
+        [JsonConstructor]
+        public DDALine(System.Drawing.Point startPoint, System.Drawing.Point endPoint, System.Drawing.Color color, int brushThickness = 1)
+        {
+            _startPoint = startPoint;
+            _endPoint = endPoint;
+            _handlePoints = new()
+            {
+                _startPoint,
+                _endPoint
+            };
+            Pixels = CalculatePixels();
+            Color = color;
+            BrushThickness = brushThickness;
+        }
+
+        #endregion
+
+        #region Properties
+
+        public List<System.Drawing.Point> Pixels { get; private set; }
+
+        public System.Drawing.Point StartPoint
         {
             get 
             {
@@ -30,7 +66,7 @@ namespace CG_Task3
             }
         }
 
-        public StylusPoint EndPoint 
+        public System.Drawing.Point EndPoint 
         {
             get 
             {
@@ -44,13 +80,15 @@ namespace CG_Task3
             }
         }
 
-        public StylusPointCollection HandlesPoints
+        public List<System.Drawing.Point> HandlePoints
         {
-            get {
+            get
+            {
                 return _handlePoints;
             }
             set
             {
+                Debug.Assert(value.Count == 2);
                 _handlePoints = value;
                 _startPoint = _handlePoints.ElementAt(0);
                 _endPoint = _handlePoints.ElementAt(1);
@@ -58,13 +96,14 @@ namespace CG_Task3
             }
         }
 
-        StylusPointCollection I2DPrimitive.HandlesPoints
+        List<System.Drawing.Point> I2DPrimitive.HandlePoints
         {
             get {
                 return _handlePoints;
             }
             set
             {
+                Debug.Assert(value.Count == 2);
                 _handlePoints = value;
                 _startPoint = _handlePoints.ElementAt(0);
                 _endPoint = _handlePoints.ElementAt(1);
@@ -72,39 +111,56 @@ namespace CG_Task3
             }
         }
 
-        public DDALine(StylusPoint start, StylusPoint end)
+        public Color Color { get; set; }
+
+        public int BrushThickness
         {
-            _startPoint = start;
-            _endPoint = end;
-            _handlePoints = new StylusPointCollection()
+            get 
             {
-                _startPoint,
-                _endPoint
-            };
-            Pixels = CalculatePixels();
+                return _brushThickness;
+            }
+            set
+            {
+                _brushThickness = value;
+                Pixels = CalculatePixels();
+            }
         }
 
-        private StylusPointCollection CalculatePixels()
+        #endregion
+
+        #region Helpers
+
+        private List<System.Drawing.Point> CalculatePixels()
         {
-            double dy = EndPoint.Y - StartPoint.Y;
-            double dx = EndPoint.X - StartPoint.X;
-            double m = dy / dx;
-            double y = StartPoint.Y;
-            int x = (int)StartPoint.X;
-            int endX = (int)EndPoint.X;
+            System.Drawing.Point first = (_startPoint.X < _endPoint.X) ? _startPoint : _endPoint; 
+            System.Drawing.Point second = (_startPoint.X < _endPoint.X) ? _endPoint : _startPoint;
 
-            if (EndPoint.X < StartPoint.X)
-            {
-                x = (int)EndPoint.X;
-                y = (int)EndPoint.Y;
-                endX = (int)StartPoint.X;
-            }
+            int dy = second.Y - first.Y;
+            int dx = second.X - first.X;
+            int steps;
 
-            StylusPointCollection newPointCollection = new();
-            for (; x <= endX; ++x)
+            if (Math.Abs(dx) > Math.Abs(dy))
+                steps = Math.Abs(dx);
+            else
+                steps = Math.Abs(dy);
+
+            double x_inc = dx / (double)steps;
+            double y_inc = dy / (double)steps;
+
+            double x = first.X;
+            double y = first.Y;
+
+            List<System.Drawing.Point> newPointCollection = new();
+            for (int i = 0; i <= steps; i++)
             {
-                newPointCollection.Add(new StylusPoint(x, Math.Round(y)));
-                y += m;
+                newPointCollection.Add(new System.Drawing.Point((int)Math.Round(x), (int)Math.Round(y)));
+                for(int j = 2; j <= _brushThickness; j++)
+                {
+                    MidPointCircle circle = new(new System.Drawing.Point((int)Math.Round(x), (int)Math.Round(y)), j);
+                    newPointCollection = newPointCollection.Union(circle.Pixels).ToList();
+                }
+                x += x_inc;
+                y += y_inc;
             }
 
             return newPointCollection;
@@ -112,17 +168,18 @@ namespace CG_Task3
 
         private void UpdateHandlePoints()
         {
-            _handlePoints = new StylusPointCollection()
+            _handlePoints = new()
             {
                 _startPoint,
                 _endPoint
             };
         }
 
+        #endregion
+
         public override string ToString()
         {
             return $"Line from ({StartPoint.X},{StartPoint.Y}) to ({EndPoint.X},{EndPoint.Y})";
         }
-
     }
 }

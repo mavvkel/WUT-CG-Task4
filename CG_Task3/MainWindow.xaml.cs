@@ -2,22 +2,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Controls.Primitives;
-using System.Threading.Channels;
-using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using Extensions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace CG_Task3
 {
@@ -27,22 +23,29 @@ namespace CG_Task3
     public partial class MainWindow : Window
     {
         // statics
-        static readonly DrawingAttributes selectDA = new();
-        DrawingAttributes drawingDA = new();
+        static readonly System.Drawing.Color selectColor = System.Drawing.Color.CornflowerBlue;
 
         // flags
-        bool isDrawingLine = false;
         bool currentlyDrawing = false;
+        bool isDrawingLine = false;
+        bool isDrawingCircle = false;
+        bool isDrawingPolygon = false;
+        bool isDrawingRectangle = false;
         bool isDrawingTask = false;
+        bool isAntialiasingOn = false;
 
         // buffers
-        StylusPoint? pointBuffer = null;
+        System.Drawing.Point? pointBuffer = null;
+        List<System.Drawing.Point>? multiPointBuffer = null;
         I2DPrimitive? lastSelected = null;
         List<Thumb>? currentSelectionThumbs = null;
+        List<Thumb>? currentDrawingThumbs = null;
 
         // collections
         List<I2DPrimitive> drawnObjects;
 
+        // canvas
+        Bitmap drawingCanvas;
         //StylusPointCollection? drawnPixels = null;
         //private List<DDALine> lines = new();
 
@@ -58,12 +61,18 @@ namespace CG_Task3
             drawnObjects = new List<I2DPrimitive>();
             ObjectsListBox.ItemsSource = drawnObjects;
 
-            selectDA.Color = Colors.CornflowerBlue;
+            // Init drawing canvas
+            ResetCanvas();
+            Debug.Assert(drawingCanvas != null);
         }
 
         private void LineBt_Click(object sender, RoutedEventArgs e)
         {
             isDrawingLine = !isDrawingLine;
+            isDrawingCircle = false;
+            isDrawingPolygon = false;
+            isDrawingRectangle = false;
+            isDrawingTask = false;
             StatusMsgLabel.Content = $"Line drawing = {isDrawingLine}";
             if (isDrawingLine)
             {
@@ -73,28 +82,94 @@ namespace CG_Task3
             {
                 LineBt.Foreground = (SolidColorBrush)App.Current.Resources["DarkThemeFGBrush"];
             }
+
+            DeselectOtherDrawingButtons(LineBt);
         }
 
         private void Open_Click(object sender, RoutedEventArgs e)
         {
+            using var dialog = new System.Windows.Forms.OpenFileDialog();
+            dialog.Filter = "JSON Files|*.json";
+            dialog.RestoreDirectory = true;
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                FileInfo jsonFileInfo = new FileInfo(dialog.FileName);
+                var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects };
+                JArray json = JArray.Parse(File.ReadAllText(jsonFileInfo.FullName));
+                IList<JToken> objects = json.Children().ToList();
+
+                foreach(JToken obj in objects )
+                {
+                    if(obj.First.First.ToString() == "CG_Task3.DDALine, CG_Task3")
+                    {
+                        DDALine newLine = obj.ToObject<DDALine>();
+                        Debug.Assert(null != newLine);
+                        drawnObjects.Add(newLine);
+                    }
+                    else if(obj.First.First.ToString() == "CG_Task3.MidPointCircle, CG_Task3")
+                    {
+                        MidPointCircle newCircle = obj.ToObject<MidPointCircle>();
+                        Debug.Assert(null != newCircle);
+                        drawnObjects.Add(newCircle);
+
+                    }
+                    else if(obj.First.First.ToString() == "CG_Task3.Polygon, CG_Task3")
+                    {
+                        Polygon newPolygon = obj.ToObject<Polygon>();
+                        Debug.Assert(null != newPolygon);
+                        drawnObjects.Add(newPolygon);
+                    }
+                }
+
+                ResetCanvas();
+                RedrawAllObjects();
+                ObjectsListBox.Items.Refresh();
+            }
 
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
+            using (System.Windows.Forms.SaveFileDialog saveFileDialog = new())
+            {
+                saveFileDialog.Filter = "JSON Files|*.json";
+                saveFileDialog.RestoreDirectory = true;
 
+                if (saveFileDialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects };
+                    string json = JsonConvert.SerializeObject(drawnObjects, Formatting.Indented, settings);
+                    //var options = new JsonSerializerOptions { WriteIndented = true,  };
+                    //string json = JsonSerializer.Serialize(drawnObjects, options);
+                    File.WriteAllText(saveFileDialog.FileName, json);
+                }
+            }
         }
 
         private void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            pointBuffer = new StylusPoint(e.GetPosition(Canvas).X, e.GetPosition(Canvas).Y);
-            pointBuffer = new StylusPoint(Math.Round(pointBuffer.Value.X), Math.Round(pointBuffer.Value.Y));
+            pointBuffer = new System.Drawing.Point((int)e.GetPosition(Canvas).X, (int)e.GetPosition(Canvas).Y);
             if (isDrawingLine)
             {
                 currentlyDrawing = true;
                 StatusMsgLabel.Content = $"Button down recorded, coords = ({pointBuffer.Value.X},{pointBuffer.Value.Y})";
             }
             else if (isDrawingTask)
+            {
+                currentlyDrawing = true;
+                StatusMsgLabel.Content = $"Button down recorded, coords = ({pointBuffer.Value.X},{pointBuffer.Value.Y})";
+            }
+            else if (isDrawingCircle)
+            {
+                currentlyDrawing = true;
+                StatusMsgLabel.Content = $"Button down recorded, coords = ({pointBuffer.Value.X},{pointBuffer.Value.Y})";
+            }
+            else if (isDrawingPolygon)
+            {
+                currentlyDrawing = true;
+                StatusMsgLabel.Content = $"Button down recorded, coords = ({pointBuffer.Value.X},{pointBuffer.Value.Y})";
+            }
+            else if (isDrawingRectangle)
             {
                 currentlyDrawing = true;
                 StatusMsgLabel.Content = $"Button down recorded, coords = ({pointBuffer.Value.X},{pointBuffer.Value.Y})";
@@ -107,88 +182,156 @@ namespace CG_Task3
         {
             if (currentlyDrawing)
             {
+                var newColor = colorPicker.SelectedColor.ToSystemDrawingColor();
+                if (null == newColor)
+                    newColor = System.Drawing.Color.Black;
+
                 if (isDrawingLine)
                 {
                     currentlyDrawing = false;
-                    StylusPoint endPoint = new (e.GetPosition(Canvas).X, e.GetPosition(Canvas).Y);
-                    endPoint = new StylusPoint(Math.Round(endPoint.X), Math.Round(endPoint.Y));
+                    System.Drawing.Point endPoint = new ((int)e.GetPosition(Canvas).X, (int)e.GetPosition(Canvas).Y);
                     StatusMsgLabel.Content = $"Button up recorded, coords = ({endPoint.X},{endPoint.Y})";
 
                     Debug.Assert(pointBuffer.HasValue);
-                    DDALine newLine = new(pointBuffer.Value, endPoint);
-                    DrawPoints(newLine.Pixels);
+                    DDALine newLine = new(pointBuffer.Value, endPoint, newColor.Value, Int32.Parse((string)((ComboBoxItem)ThicknessComboBox.SelectedValue).Content));
                     drawnObjects.Add(newLine);
+                    PutObjectOnCanvas(newLine, newLine.Color);
+                    ObjectsListBox.UpdateLayout();
+                    ObjectsListBox.Items.Refresh();
+                }
+                else if (isDrawingCircle)
+                {
+                    currentlyDrawing = false;
+                    System.Drawing.Point radiusPoint = new ((int)e.GetPosition(Canvas).X, (int)e.GetPosition(Canvas).Y);
+                    StatusMsgLabel.Content = $"Button up recorded, coords = ({radiusPoint.X},{radiusPoint.Y})";
+
+                    Debug.Assert(pointBuffer.HasValue);
+                    int radius = (int)Math.Round(Math.Sqrt(Math.Pow(pointBuffer.Value.X - radiusPoint.X, 2) + Math.Pow(pointBuffer.Value.Y - radiusPoint.Y, 2)));
+                    MidPointCircle newCircle = new(pointBuffer.Value, radius, newColor.Value);;
+                    //if(newCircle.Pixels.Where(pixel => (pixel.X >= 0 && pixel.X < 800 && pixel.Y >= 0 && pixel.Y < 600)) {
+
+                    //}
+                    drawnObjects.Add(newCircle);
+                    PutObjectOnCanvas(newCircle, newCircle.Color);
                     ObjectsListBox.UpdateLayout();
                     ObjectsListBox.Items.Refresh();
                 }
                 else if (isDrawingTask)
                 {
+                    /*
                     currentlyDrawing = false;
                     StylusPoint endPoint = new(e.GetPosition(Canvas).X, e.GetPosition(Canvas).Y);
                     endPoint = new StylusPoint(Math.Round(endPoint.X), Math.Round(endPoint.Y));
                     StatusMsgLabel.Content = $"Button up recorded, coords = ({endPoint.X},{endPoint.Y})";
 
                     Debug.Assert(pointBuffer.HasValue);
-                    TaskShape newTaskShape = new(pointBuffer.Value, endPoint);
-                    DrawPoints(newTaskShape.ShapePixels);
+                    //TaskShape newTaskShape = new(pointBuffer.Value, endPoint);
+                    */
                 }
+                else if (isDrawingPolygon)
+                {
+                    if(null == multiPointBuffer)
+                    {
+                        multiPointBuffer = new();
+                        currentDrawingThumbs = new();
+                    }
 
+                    System.Drawing.Point point = new ((int)e.GetPosition(Canvas).X, (int)e.GetPosition(Canvas).Y);
+                    StatusMsgLabel.Content = $"Button up recorded, coords = ({point.X},{point.Y})";
+
+                    // polygon closing condition
+                    if (multiPointBuffer.Count >= 2 && Math.Abs(point.X - multiPointBuffer.ElementAt(0).X) < 20 && Math.Abs(point.Y - multiPointBuffer.ElementAt(0).Y) < 20)
+                    {
+                        currentlyDrawing = false;
+                        Polygon newPolygon = new(multiPointBuffer, newColor.Value);
+                        drawnObjects.Add(newPolygon);
+                        PutObjectOnCanvas(newPolygon, newPolygon.Color);
+                        ObjectsListBox.UpdateLayout();
+                        ObjectsListBox.Items.Refresh();
+                        multiPointBuffer.Clear();
+                        if (null != currentDrawingThumbs)
+                        {
+                            foreach (Thumb thumbChild in currentDrawingThumbs)
+                                CanvasFrame.Children.Remove(thumbChild);
+
+                            currentDrawingThumbs.Clear();
+                        }
+                    }
+                    else
+                    {
+                        currentDrawingThumbs.Add(new Thumb());
+                        Thumb current = currentDrawingThumbs.Last();
+                        CanvasFrame.Children.Add(current);
+                        var thumbTemplate = (ControlTemplate)Application.Current.MainWindow.Resources["EditHandleTemplate"];
+                        current.Template = thumbTemplate;
+                        System.Windows.Controls.Canvas.SetLeft(current, point.X - 5); // 5 is 1/2 of Width in EditHandleTemplate
+                        System.Windows.Controls.Canvas.SetTop(current, point.Y - 5); // 5 is 1/2 of Height in EditHandleTemplate
+                        multiPointBuffer.Add(point); // only if not closing
+                        StatusMsgLabel.Content = $"MultiPointBuffer contains {multiPointBuffer}";
+                    }
+                }
+                else if (isDrawingRectangle)
+                {
+                    currentlyDrawing = false;
+                    System.Drawing.Point endPoint = new ((int)e.GetPosition(Canvas).X, (int)e.GetPosition(Canvas).Y);
+                    StatusMsgLabel.Content = $"Button up recorded, coords = ({endPoint.X},{endPoint.Y})";
+
+                    Debug.Assert(pointBuffer.HasValue);
+                    Rectangle newRectangle = new(pointBuffer.Value, endPoint, newColor.Value);
+                    drawnObjects.Add(newRectangle);
+                    PutObjectOnCanvas(newRectangle, newRectangle.Color);
+                    ObjectsListBox.UpdateLayout();
+                    ObjectsListBox.Items.Refresh();
+                }
             }
             else
                 StatusMsgLabel.Content = $"Button up recorded but no drawing option selected";
         }
 
-        private void DrawPoints(StylusPointCollection points)
-        {
-            Stroke stroke = new(points, Canvas.DefaultDrawingAttributes);
-            Canvas.Strokes.Add(stroke);
-        }
-
         private void ObjectsListBox_SelectionChanged(object sender, RoutedEventArgs e)
         {
+            // Unselect previously selected items
+            if (null != lastSelected)
+                RedrawAllObjects();         // TODO: Only partial redraw would improve performance
+
+            // Erase previous edit handles
+            if (null != currentSelectionThumbs)
+            {
+                foreach (Thumb thumbChild in currentSelectionThumbs)
+                    CanvasFrame.Children.Remove(thumbChild);
+
+                currentSelectionThumbs.Clear();
+            }
+
             if (null != ObjectsListBox.SelectedItem)
             {
-                // Unselect previously selected items
-                if (null != lastSelected)
-                    ChangeCanvasStroke(lastSelected, drawingDA);
-
-                // Erase previous edit handles
-                if (null != currentSelectionThumbs)
-                {
-                    foreach (Thumb thumbChild in currentSelectionThumbs)
-                        Canvas.Children.Remove(thumbChild);
-
-                    currentSelectionThumbs.Clear();
-                }
-
                 // Selecting the new stroke
                 I2DPrimitive? selectedObject = (I2DPrimitive)ObjectsListBox.SelectedItem;
-
-                //Stroke selectedStroke= Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(selectedObject.Pixels)).First();
-                //StrokeCollection selectedStrokeCollection = new()
-                //{
-                //    selectedStroke
-                //};
-                //Canvas.Select(selectedStrokeCollection);
                 StatusMsgLabel.Content = $"Object selected = {selectedObject}";
+                PutObjectOnCanvas(selectedObject, selectColor);
 
-                ChangeCanvasStroke(selectedObject, selectDA);
+
                 currentSelectionThumbs = new List<Thumb>();
-                foreach (StylusPoint handlePoint in selectedObject.HandlesPoints)
+                foreach (System.Drawing.Point handlePoint in selectedObject.HandlePoints)
                 {
                     currentSelectionThumbs.Add(new Thumb());
                     Thumb current = currentSelectionThumbs.Last();
-                    current.Tag = new Tuple<I2DPrimitive, int>(selectedObject, selectedObject.HandlesPoints.IndexOf(handlePoint));
-                    Canvas.Children.Add(current);
+                    current.Tag = selectedObject.HandlePoints.IndexOf(handlePoint);
+                    CanvasFrame.Children.Add(current);
                     var thumbTemplate = (ControlTemplate)Application.Current.MainWindow.Resources["EditHandleTemplate"];
                     current.Template = thumbTemplate;
                     current.DragDelta += OnDragDelta;
-                    InkCanvas.SetLeft(current, handlePoint.X - 5); // 5 is 1/2 of Width in EditHandleTemplate
-                    InkCanvas.SetTop(current, handlePoint.Y - 5); // 5 is 1/2 of Height in EditHandleTemplate
+                    System.Windows.Controls.Canvas.SetLeft(current, handlePoint.X - 5); // 5 is 1/2 of Width in EditHandleTemplate
+                    System.Windows.Controls.Canvas.SetTop(current, handlePoint.Y - 5); // 5 is 1/2 of Height in EditHandleTemplate
                 }
 
                 lastSelected = selectedObject;
                 DeleteBt.IsEnabled = true;
+            }
+            else
+            {
+                DeleteBt.IsEnabled = false;
+                lastSelected = null;
             }
         }
 
@@ -210,86 +353,290 @@ namespace CG_Task3
         private void DeleteBt_Click(object sender, RoutedEventArgs e)
         {
             Debug.Assert(lastSelected != null);
-            Debug.Assert(Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(lastSelected.Pixels)).Count() == 1);
-            Canvas.Strokes.Remove(
-                Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(lastSelected.Pixels))
-                .First());
             drawnObjects.Remove(lastSelected);
             lastSelected = null;
             ObjectsListBox.Items.Refresh();
-            //ObjectsListBox.UpdateLayout();
+            DeleteBt.IsEnabled = false;
             if (null != currentSelectionThumbs)
             {
                 foreach (Thumb thumbChild in currentSelectionThumbs)
-                    Canvas.Children.Remove(thumbChild);
+                    CanvasFrame.Children.Remove(thumbChild);
 
                 currentSelectionThumbs.Clear();
             }
-            DeleteBt.IsEnabled = false;
-        }
-
-        private void ChangeCanvasStroke(I2DPrimitive drawnObject, DrawingAttributes newDA)
-        {
-            Debug.Assert(Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(drawnObject.Pixels)).Count() == 1);
-
-            Stroke oldStroke = Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(drawnObject.Pixels)).First();
-            Stroke newStroke = oldStroke.Clone();
-            newStroke.DrawingAttributes = newDA;
-
-            StrokeCollection newStrokeCollection = new()
-            {
-                newStroke
-            };
-            Canvas.Strokes.Replace(oldStroke, newStrokeCollection);
+            RedrawAllObjects();
         }
 
         private void OnDragDelta(object sender, DragDeltaEventArgs e)
         {
             Thumb handle = (Thumb)sender;
 
-            double newX = Math.Round(InkCanvas.GetLeft(handle) + e.HorizontalChange);
-            double newY = Math.Round(InkCanvas.GetTop(handle) + e.VerticalChange);
+            double newX = Math.Round(System.Windows.Controls.Canvas.GetLeft(handle) + e.HorizontalChange);
+            double newY = Math.Round(System.Windows.Controls.Canvas.GetTop(handle) + e.VerticalChange);
 
             // Move the handle
-            InkCanvas.SetLeft(handle, newX - 5);
-            InkCanvas.SetTop(handle, newY - 5);
+            System.Windows.Controls.Canvas.SetLeft(handle, newX - 5);
+            System.Windows.Controls.Canvas.SetTop(handle, newY - 5);
 
-
-            //I2DPrimitive selectedObject = ((Tuple<I2DPrimitive, int>)handle.Tag).Item1;
-            //StylusPointCollection oldPointCollection = new(selectedObject.Pixels);
-            //int pointIndex = ((Tuple<I2DPrimitive, int>)handle.Tag).Item2;
+            // Move the object's handle point
+            int handlePointIndex = (int)handle.Tag;
+            Debug.Assert(null != lastSelected);
+            int x = lastSelected.HandlePoints.ElementAt(handlePointIndex).X;
+            int y = lastSelected.HandlePoints.ElementAt(handlePointIndex).Y;
+            StatusMsgLabel.Content = $"Modify point ({x}, {y}) of the object {lastSelected}";
+            System.Drawing.Point newPoint = new((int)newX, (int)newY);
+            var handlePoints = lastSelected.HandlePoints;
+            handlePoints.RemoveAt(handlePointIndex);
+            handlePoints.Insert(handlePointIndex, newPoint);
+            lastSelected.HandlePoints = handlePoints;
 
             // Update the drawn object
-            //Debug.Assert(drawnObjects.ElementAt(pointIndex) == selectedObject);
-            //StylusPointCollection updatedPointCollection = new(selectedObject.HandlesPoints);
-            //updatedPointCollection.RemoveAt(pointIndex);
-            //updatedPointCollection.Insert(pointIndex, new StylusPoint(newX, newY));
-            //selectedObject.HandlesPoints = updatedPointCollection;
-
-            //// Update the Canvas stroke
-            //Stroke updatedObjectStroke = new(updatedPointCollection);
-            //StrokeCollection updatedStrokeCollection = new()
-            //{
-            //    updatedObjectStroke
-            //};
-            //Canvas.Strokes.Replace(
-            //    Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(oldPointCollection))
-            //    .First(), updatedStrokeCollection);
-
-            //Canvas.Strokes.Replace(
-            //    Canvas.Strokes.Where(stroke => stroke.StylusPoints.SequenceEqual(oldPointCollection))
-            //    .First(), updatedStrokeCollection);
-
-            //selectedObject.HandlesPoints = movedPoints;
-            //UpdateCanvasStrokes();
-            //StylusPoint selectedObject.Pixels.Where(point => (point.X == movedPoint.X) && (point.Y == movedPoint.Y)).First().X = 
+            RedrawAllObjects();     // TODO: partial redraw for performance
+            PutObjectOnCanvas(lastSelected, selectColor);
+            ObjectsListBox.Items.Refresh();
         }
 
-        private void UpdateCanvasStrokes()
+        private void PutObjectOnCanvas(I2DPrimitive drawnObject, System.Drawing.Color color)
         {
-            Canvas.Strokes.Clear();
+            System.Drawing.Rectangle encompassingRect = GetEncompassingRectangle(drawnObject);
+            BitmapData canvasPartData = drawingCanvas.LockBits(encompassingRect, ImageLockMode.ReadWrite, drawingCanvas.PixelFormat);
+            int bytes = canvasPartData.Stride * encompassingRect.Height;
+            byte[] argbValues = new byte[bytes];
+            IntPtr ptr = canvasPartData.Scan0;
+            System.Runtime.InteropServices.Marshal.Copy(ptr, argbValues, 0, bytes);
+
+
+            if(isAntialiasingOn && drawnObject.GetType() == typeof(DDALine))
+            {
+
+            }
+            else
+                foreach (System.Drawing.Point pixel in drawnObject.Pixels)
+                {
+                    argbValues[(pixel.Y - encompassingRect.Y) * canvasPartData.Stride + (pixel.X - encompassingRect.X) * 4 + (int)ColorChannels.Blue] = color.B;
+                    argbValues[(pixel.Y - encompassingRect.Y) * canvasPartData.Stride + (pixel.X - encompassingRect.X) * 4 + (int)ColorChannels.Green] = color.G;
+                    argbValues[(pixel.Y - encompassingRect.Y) * canvasPartData.Stride + (pixel.X - encompassingRect.X) * 4 + (int)ColorChannels.Red] = color.R;
+                }
+
+            System.Runtime.InteropServices.Marshal.Copy(argbValues, 0, ptr, bytes);
+            drawingCanvas.UnlockBits(canvasPartData);
+            RefreshCanvasDisplay();
+        }
+
+        private void RefreshCanvasDisplay()
+        {
+            using (MemoryStream ms = new())
+            {
+                drawingCanvas.Save(ms, ImageFormat.Png);
+                BitmapImage bitmap = new();
+                ms.Position = 0;
+                bitmap.BeginInit();
+                //bitmap.CreateOptions = BitmapCreateOptions.PreservePixelFormat;   // is there a way to actually make this bitmap rgba? this does not work
+                bitmap.StreamSource = ms;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                Canvas.Source = bitmap;
+            }
+        }
+
+        private static System.Drawing.Rectangle GetEncompassingRectangle(I2DPrimitive figure)
+        {
+            int x = figure.Pixels.Min(pixel => pixel.X);
+            int y = figure.Pixels.Min(pixel => pixel.Y);
+            int width = figure.Pixels.Max(pixel => pixel.X) -  x + 1;
+            int height = figure.Pixels.Max(pixel => pixel.Y) - y + 1;
+
+            Debug.Assert(x >= 0);
+            Debug.Assert(y >= 0);
+
+            return new System.Drawing.Rectangle(x, y, width, height);
+        }
+
+        private void ResetCanvas()
+        {
+            drawingCanvas = new((int)CanvasFrame.Width, (int)CanvasFrame.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            System.Drawing.Rectangle rect = new(0, 0, drawingCanvas.Width, drawingCanvas.Height);
+            BitmapData canvasData = drawingCanvas.LockBits(rect, ImageLockMode.WriteOnly, drawingCanvas.PixelFormat);
+            int bytes = Math.Abs(canvasData.Stride) * drawingCanvas.Height;
+            byte[] argbValues = new byte[bytes];
+            Array.Fill(argbValues, (byte)255);
+            IntPtr ptr = canvasData.Scan0;
+            System.Runtime.InteropServices.Marshal.Copy(argbValues, 0, ptr, bytes);
+            drawingCanvas.UnlockBits(canvasData);
+            RefreshCanvasDisplay();
+        }
+
+        private void RedrawAllObjects()
+        {
+            ResetCanvas();
             foreach (I2DPrimitive drawnObject in drawnObjects)
-                DrawPoints(drawnObject.Pixels);
+                PutObjectOnCanvas(drawnObject, drawnObject.Color);
+
+            RefreshCanvasDisplay();
+        }
+
+        private void CircleBt_Click(object sender, RoutedEventArgs e)
+        {
+            isDrawingCircle = !isDrawingCircle;
+            isDrawingLine = false;
+            isDrawingTask = false;
+            isDrawingRectangle = false;
+            isDrawingPolygon = false;
+            StatusMsgLabel.Content = $"Circle drawing = {isDrawingCircle}";
+            if (isDrawingCircle)
+            {
+                CircleBt.Foreground = new SolidColorBrush(Colors.CornflowerBlue);
+            }
+            else
+            {
+                CircleBt.Foreground = (SolidColorBrush)App.Current.Resources["DarkThemeFGBrush"];
+            }
+
+            DeselectOtherDrawingButtons(CircleBt);
+        }
+        
+        private void DeselectOtherDrawingButtons(Button clickedButton)
+        {
+            foreach (UIElement element in LeftToolbar.Children)
+            {
+                Button button = element as Button;
+                if(null != button)
+                {
+                    if(button.Name != clickedButton.Name)
+                        button.Foreground = (SolidColorBrush)App.Current.Resources["DarkThemeFGBrush"];
+                }
+            }
+        }
+
+        private void PolygonBt_Click(object sender, RoutedEventArgs e)
+        {
+            isDrawingPolygon = !isDrawingPolygon;
+            isDrawingLine = false;
+            isDrawingCircle = false;
+            isDrawingTask = false;
+            StatusMsgLabel.Content = $"Polygon drawing = {isDrawingPolygon}";
+            if (isDrawingPolygon)
+            {
+                PolygonBt.Foreground = new SolidColorBrush(Colors.CornflowerBlue);
+            }
+            else
+            {
+                PolygonBt.Foreground = (SolidColorBrush)App.Current.Resources["DarkThemeFGBrush"];
+            }
+
+            DeselectOtherDrawingButtons(PolygonBt);
+        }
+
+        private void ResetCanvasBt_Click(object sender, RoutedEventArgs e)
+        {
+            ResetCanvas();
+
+            System.Drawing.Point? pointBuffer = null;
+            List<System.Drawing.Point>? multiPointBuffer = null;
+            I2DPrimitive? lastSelected = null;
+            List<Thumb>? currentSelectionThumbs = null;
+            List<Thumb>? currentDrawingThumbs = null;
+            drawnObjects.Clear();
+            ObjectsListBox.Items.Refresh();
+
+            DeleteBt.IsEnabled = false;
+            Debug.Assert(drawnObjects.Count == 0);
+        }
+
+        private void colorPicker_SelectedColorChanged(object sender, RoutedPropertyChangedEventArgs<System.Windows.Media.Color?> e)
+        {
+            if(null != lastSelected)
+            {
+                Debug.Assert(null != e.NewValue);
+                var newColor = e.NewValue.ToSystemDrawingColor();
+                if (null == newColor)
+                    newColor = System.Drawing.Color.Black;
+                lastSelected.Color = newColor.Value;
+                PutObjectOnCanvas(lastSelected, lastSelected.Color);
+            }
+        }
+
+        private void ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if(null != lastSelected && lastSelected.GetType() == typeof(DDALine))
+            {
+                ComboBox box = (ComboBox)sender;
+                Debug.Assert(null != box);
+                ((DDALine)lastSelected).BrushThickness = Int32.Parse((string)((ComboBoxItem)box.SelectedValue).Content);
+                RedrawAllObjects();
+                PutObjectOnCanvas(lastSelected, selectColor);
+            }
+        }
+
+        private void AntialiasingBt_Click(object sender, RoutedEventArgs e)
+        {
+            isAntialiasingOn = !isAntialiasingOn;
+            RedrawAllObjects();
+        }
+
+        void ThickAntialiasedLine(int x1, int y1, int x2, int y2, float thickness)
+        {
+            //initial values in Bresenham;s algorithm
+            int dx = x2 - x1, dy = y2 - y1;
+            int dE = 2 * dy, dNE = 2 * (dy - dx);
+            int d = 2 * dy - dx;
+            int two_v_dx = 0; //numerator, v=0 for the first pixel
+            float invDenom = (float)(1 / (2 * Math.Sqrt(dx * dx + dy * dy))); //inverted denominator
+            float two_dx_invDenom = 2 * dx * invDenom; //precomputed constant
+            int x = x1, y = y1;
+            int i;
+            IntensifyPixel(x, y, thickness, 0);
+            for (i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom) == 1; ++i);
+            for (i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom) == 1; ++i);
+            while (x < x2)
+            {
+                ++x;
+                if (d < 0) // move to E
+                {
+                    two_v_dx = d + dx;
+                    d += dE;
+                }
+                else // move to NE
+                {
+                    two_v_dx = d - dx;
+                    d += dNE;
+                    ++y;
+                }
+                // Now set the chosen pixel and its neighbors
+                IntensifyPixel(x, y, thickness, two_v_dx * invDenom);
+                for (i = 1; IntensifyPixel(x, y + i, thickness, i * two_dx_invDenom - two_v_dx * invDenom) == 1; ++i) ;
+                for (i = 1; IntensifyPixel(x, y - i, thickness, i * two_dx_invDenom + two_v_dx * invDenom) == 1; ++i) ;
+            }
+        }
+
+        int IntensifyPixel(int x, int y, float thickness, float distance)
+        {
+            float r = 0.5f;
+            //float cov = coverage(thickness, distance, r);
+            //if (cov > 0)
+            //putPixel(x, y, lerp(BKG_COLOR, LINE_COLOR, cov));
+            //return cov;
+            return -999;
+        }
+
+        private void RectangleBt_Click(object sender, RoutedEventArgs e)
+        {
+            isDrawingRectangle = !isDrawingRectangle;
+            isDrawingLine = false;
+            isDrawingCircle = false;
+            isDrawingPolygon = false;
+            isDrawingTask = false;
+            StatusMsgLabel.Content = $"Rectangle drawing = {isDrawingRectangle}";
+            if (isDrawingRectangle)
+            {
+                RectangleBt.Foreground = new SolidColorBrush(Colors.CornflowerBlue);
+            }
+            else
+            {
+                RectangleBt.Foreground = (SolidColorBrush)App.Current.Resources["DarkThemeFGBrush"];
+            }
+
+            DeselectOtherDrawingButtons(RectangleBt);
         }
     }
 }

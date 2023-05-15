@@ -13,19 +13,19 @@ namespace CG_Task3
     {
         public DDALine BaseLine { get; set; }
 
-        public StylusPointCollection ShapePixels { get; private set; }
+        public List<System.Drawing.Point> ShapePixels { get; private set; }
 
 
-        public TaskShape(StylusPoint start, StylusPoint end)
+        public TaskShape(System.Drawing.Point start, System.Drawing.Point end)
         {
             BaseLine = new DDALine(start, end);
             ShapePixels = CalculateShapePixels();
         }
 
-        private StylusPointCollection CalculateShapePixels()
+        private List<System.Drawing.Point> CalculateShapePixels()
         {
             int N = 3;      // adjustable number of half circles
-            StylusPointCollection pixels = BaseLine.Pixels.Clone();
+            List<System.Drawing.Point> pixels = BaseLine.Pixels;
 
             if (BaseLine.StartPoint.X != BaseLine.EndPoint.X)
             {
@@ -36,11 +36,11 @@ namespace CG_Task3
                 List<Point> centers = new();
                 for (int i = 1; i <= N; i++)
                 {
-                    StylusPointCollection circle = ProduceAngledHalfCirclePoints(new Point(BaseLine.StartPoint.X + Math.Sign(lineAngle) * (i + 0.5f) * lenght * Math.Cos(lineAngle),
+                     List<System.Drawing.Point> circle = ProduceAngledHalfCirclePoints(new Point(BaseLine.StartPoint.X + Math.Sign(lineAngle) * (i + 0.5f) * lenght * Math.Cos(lineAngle),
                                                                                     BaseLine.StartPoint.Y + Math.Sign(lineAngle) * (i + 0.5f) * lenght * Math.Sin(lineAngle)),
                                                                                 radius,
                                                                                 lineAngle);
-                    pixels.Add(circle);
+                    pixels.Concat(circle);
                 }
             }
 
@@ -53,29 +53,29 @@ namespace CG_Task3
         //}
 
 
-        private StylusPointCollection ProduceAngledHalfCirclePoints(Point center, double radius, double angle)
+        private List<System.Drawing.Point> ProduceAngledHalfCirclePoints(Point center, double radius, double angle)
         {
-            StylusPointCollection points = new();
+            List<System.Drawing.Point> points = new();
             midPointCircleDraw((int)center.X, (int)center.Y, (int)radius, points);
 
             return points;
         }
 
-        void midPointCircleDraw(int x_centre, int y_centre, int r, StylusPointCollection points)
+        void midPointCircleDraw(int x_centre, int y_centre, int r, List<System.Drawing.Point> points)
         {
             int x = r, y = 0;
 
             // Printing the initial point on the axes
             // after translation
-            points.Add(new StylusPoint(x + x_centre, y + y_centre));
+            points.Add(new System.Drawing.Point(x + x_centre, y + y_centre));
 
             // When radius is zero only a single
             // point will be printed
             if (r > 0)
             {
-                points.Add(new StylusPoint(x + x_centre, -y + y_centre));
-                points.Add(new StylusPoint(y + x_centre, x + y_centre));
-                points.Add(new StylusPoint(-y + x_centre, x + y_centre));
+                points.Add(new System.Drawing.Point(x + x_centre, -y + y_centre));
+                points.Add(new System.Drawing.Point(y + x_centre, x + y_centre));
+                points.Add(new System.Drawing.Point(-y + x_centre, x + y_centre));
             }
 
             // Initialising the value of P
@@ -100,19 +100,19 @@ namespace CG_Task3
 
                 // Printing the generated point and its reflection
                 // in the other octants after translation
-                points.Add(new StylusPoint(x + x_centre, y + y_centre));
-                points.Add(new StylusPoint(-x + x_centre, y + y_centre));
-                points.Add(new StylusPoint(x + x_centre, -y + y_centre));
-                points.Add(new StylusPoint(-x + x_centre, -y + y_centre));
+                points.Add(new System.Drawing.Point(x + x_centre, y + y_centre));
+                points.Add(new System.Drawing.Point(-x + x_centre, y + y_centre));
+                points.Add(new System.Drawing.Point(x + x_centre, -y + y_centre));
+                points.Add(new System.Drawing.Point(-x + x_centre, -y + y_centre));
 
                 // If the generated point is on the line x = y then
                 // the perimeter points have already been printed
                 if (x != y)
                 {
-                    points.Add(new StylusPoint(y + x_centre, x + y_centre));
-                    points.Add(new StylusPoint(-y + x_centre, x + y_centre));
-                    points.Add(new StylusPoint(y + x_centre, -x + y_centre));
-                    points.Add(new StylusPoint(-y + x_centre, -x + y_centre));
+                    points.Add(new System.Drawing.Point(y + x_centre, x + y_centre));
+                    points.Add(new System.Drawing.Point(-y + x_centre, x + y_centre));
+                    points.Add(new System.Drawing.Point(y + x_centre, -x + y_centre));
+                    points.Add(new System.Drawing.Point(-y + x_centre, -x + y_centre));
                 }
             }
         }

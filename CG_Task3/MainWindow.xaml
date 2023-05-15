@@ -3,9 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:wpfTool="clr-namespace:Xceed.Wpf.Toolkit;assembly=Xceed.Wpf.Toolkit.NET5"
         xmlns:local="clr-namespace:CG_Task3"
         mc:Ignorable="d"
-        Title="MyVectorGraphicsEditor" Height="450" Width="840"
+        Title="MyVectorGraphicsEditor" 
         Foreground="{StaticResource DarkThemeFGBrush}" Background="{StaticResource DarkThemeBGBrush}">
 
     <Window.Resources>
@@ -52,12 +53,28 @@
             <Border BorderBrush="{StaticResource DarkThemeFGBrush}" BorderThickness="0,0,1,0">
                 <StackPanel Name="LeftToolbar">
                     <Button Name="LineBt" VerticalAlignment="Top" Click="LineBt_Click">Line</Button>
+                    <Button Name="CircleBt" VerticalAlignment="Top" Click="CircleBt_Click">Circle</Button>
+                    <Button Name="PolygonBt" VerticalAlignment="Top" Click="PolygonBt_Click">Polygon</Button>
+                    <Button Name="RectangleBt" VerticalAlignment="Top" Click="RectangleBt_Click">Rectangle</Button>
                     <Button Name="TaskBt" VerticalAlignment="Top" Click="TaskBt_Click">Task</Button>
                     <Separator Height="25" Margin="25,0,25,0"/>
                     <ListBox Name="ObjectsListBox" Background="{StaticResource DarkThemeBGBrush}" Foreground="{StaticResource DarkThemeFGBrush}" Height="150"
                              ScrollViewer.HorizontalScrollBarVisibility="Hidden" SelectionChanged="ObjectsListBox_SelectionChanged">
                     </ListBox>
-                    <Button Name="DeleteBt" VerticalAlignment="Top" Click="DeleteBt_Click">Delete</Button>
+                    <Button Name="DeleteBt" VerticalAlignment="Top" Click="DeleteBt_Click">Delete object</Button>
+                    <Label HorizontalAlignment="Center" Foreground="{StaticResource DarkThemeFGBrush}">Object color</Label>
+                    <wpfTool:ColorPicker x:Name="colorPicker" AvailableColorsSortingMode="HueSaturationBrightness" SelectedColor="Black" SelectedColorChanged="colorPicker_SelectedColorChanged"/>
+                    <Label HorizontalAlignment="Center" Foreground="{StaticResource DarkThemeFGBrush}">Object line thickness</Label>
+                    <ComboBox Name="ThicknessComboBox" SelectedIndex="0" SelectionChanged="ComboBox_SelectionChanged">
+                        <ComboBoxItem>1</ComboBoxItem>
+                        <ComboBoxItem>3</ComboBoxItem>
+                        <ComboBoxItem>5</ComboBoxItem>
+                        <ComboBoxItem>7</ComboBoxItem>
+                    </ComboBox>
+                    <Separator Height="25" Margin="25,0,25,0"/>
+                    <Button Name="AntialiasingBt" VerticalAlignment="Top" Click="AntialiasingBt_Click">Antialiasing</Button>
+                    <Separator Height="25" Margin="25,0,25,0"/>
+                    <Button Name="ResetCanvasBt" VerticalAlignment="Top" Click="ResetCanvasBt_Click">Reset canvas</Button>
                 </StackPanel>
             </Border> 
         </ScrollViewer>
@@ -71,9 +88,11 @@
         </Border>
 
         <Border DockPanel.Dock="Right" BorderBrush="{StaticResource DarkThemeFGBrush}" BorderThickness="0,0,0,0" Padding="4,1,4,1">
-            <InkCanvas Name="Canvas" Cursor="Arrow" MouseDown="Canvas_MouseDown" MouseUp="Canvas_MouseUp" EditingMode="None" >
-
-            </InkCanvas>
+            <Canvas Name="CanvasFrame"  Width="800" Height="600" Cursor="Arrow" MouseDown="Canvas_MouseDown" MouseUp="Canvas_MouseUp" >
+                <Image Name="Canvas" Width="800" Height="600">
+                    
+                </Image>
+            </Canvas>
         </Border>
     </DockPanel>
 

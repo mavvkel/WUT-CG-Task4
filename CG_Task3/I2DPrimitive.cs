@@ -1,16 +1,18 @@
-﻿using System;
+﻿using Newtonsoft.Json;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Input;
 
 namespace CG_Task3
 {
     internal interface I2DPrimitive
     {
-        public StylusPointCollection Pixels { get; }
+        //public string Type { get; }  // feels like a hacky solution required for type serialization
 
-        public StylusPointCollection HandlesPoints { get; set; }
+        [JsonIgnore]
+        public List<System.Drawing.Point> Pixels { get; }
+
+        public List<System.Drawing.Point> HandlePoints { get; set; }
+
+        public System.Drawing.Color Color { get; set; }
+
     }
 }
