@@ -1,4 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace Extensions
 {
@@ -11,5 +13,11 @@ namespace Extensions
             else
                 return null;
         }
+
+        public static void DoEvents(this Application? app)
+        {
+            app?.Dispatcher.Invoke(DispatcherPriority.Background, new Action(delegate { }));
+        }
+
     }
 }

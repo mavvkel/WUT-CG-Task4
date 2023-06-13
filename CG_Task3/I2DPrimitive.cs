@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Drawing;
 
 namespace CG_Task3
 {
@@ -12,7 +13,10 @@ namespace CG_Task3
 
         public List<System.Drawing.Point> HandlePoints { get; set; }
 
+        public System.Drawing.Point CenterHandlePoint { get; }
+
         public System.Drawing.Color Color { get; set; }
 
+        public int BrushThickness { get; set; }
     }
 }

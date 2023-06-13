@@ -83,6 +83,7 @@ namespace CG_Task3
             set
             {
                 System.Diagnostics.Debug.Assert(value.Count == 2);
+                _handlePoints = value;
                 _center = _handlePoints.ElementAt(0);
                 _radiusHandlePoint = _handlePoints.ElementAt(1);
                 _radius = (int)Math.Sqrt(Math.Pow(_center.X - _radiusHandlePoint.X, 2) + Math.Pow(_center.Y - _radiusHandlePoint.Y, 2));
@@ -91,6 +92,17 @@ namespace CG_Task3
         }
 
         public Color Color { get; set; }
+
+        public int BrushThickness
+        {
+            get
+            {
+                return 1;
+            }
+            set { }
+        }
+
+        public Point CenterHandlePoint => Center;
 
         #endregion
 

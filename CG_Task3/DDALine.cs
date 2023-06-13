@@ -17,23 +17,10 @@ namespace CG_Task3
 
         #region Constructors
 
-        public DDALine(System.Drawing.Point startPoint, System.Drawing.Point endPoint)
-        {
-            _startPoint = startPoint;
-            _endPoint = endPoint;
-            _handlePoints = new()
-            {
-                _startPoint,
-                _endPoint
-            };
-            Pixels = CalculatePixels();
-            Color = System.Drawing.Color.Black;
-            BrushThickness = 1;
-        }
-
         [JsonConstructor]
-        public DDALine(System.Drawing.Point startPoint, System.Drawing.Point endPoint, System.Drawing.Color color, int brushThickness = 1)
+        public DDALine(System.Drawing.Point startPoint, System.Drawing.Point endPoint, System.Drawing.Color? color = null, int brushThickness = 1)
         {
+
             _startPoint = startPoint;
             _endPoint = endPoint;
             _handlePoints = new()
@@ -42,7 +29,7 @@ namespace CG_Task3
                 _endPoint
             };
             Pixels = CalculatePixels();
-            Color = color;
+            Color = color ?? System.Drawing.Color.Black;
             BrushThickness = brushThickness;
         }
 
@@ -113,6 +100,14 @@ namespace CG_Task3
 
         public Color Color { get; set; }
 
+        public double Gradient
+        {
+            get
+            {
+                return (_startPoint.Y - _endPoint.Y) / (double)(_startPoint.X - _endPoint.X);
+            }
+        }
+
         public int BrushThickness
         {
             get 
@@ -125,6 +120,8 @@ namespace CG_Task3
                 Pixels = CalculatePixels();
             }
         }
+
+        public Point CenterHandlePoint => new((StartPoint.X + EndPoint.X) / 2, (StartPoint.Y + EndPoint.Y) / 2);
 
         #endregion
 

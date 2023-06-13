@@ -32,6 +32,16 @@
                     <Ellipse Name="Handle" Height="10" Width="10" Fill="CornflowerBlue" Stroke="Black" />
                 </Grid>
             </ControlTemplate>
+            <ControlTemplate TargetType="Thumb" x:Key="ClipEditHandleTemplate">
+                <Grid>
+                    <Ellipse Name="Handle" Height="10" Width="10" Fill="Orange" Stroke="Black" />
+                </Grid>
+            </ControlTemplate>
+            <ControlTemplate TargetType="Thumb" x:Key="EditCenterHandleTemplate">
+                <Grid>
+                    <Ellipse Name="Handle" Height="10" Width="10" Fill="Red" Stroke="Black" />
+                </Grid>
+            </ControlTemplate>
 
         </ResourceDictionary>
     </Window.Resources>
@@ -74,7 +84,13 @@
                     <Separator Height="25" Margin="25,0,25,0"/>
                     <Button Name="AntialiasingBt" VerticalAlignment="Top" Click="AntialiasingBt_Click">Antialiasing</Button>
                     <Separator Height="25" Margin="25,0,25,0"/>
+                    <Button Name="ClippingBt" VerticalAlignment="Top" Click="ClippingBt_Click">Clipping mode</Button>
+                    <Button Name="FillBt" VerticalAlignment="Top" Click="FillBt_Click">Fill</Button>
+                    <Separator Height="25" Margin="25,0,25,0"/>
+                    <Button Name="BucketFillBt" VerticalAlignment="Top" Click="BucketFillBt_Click">Bucket fill</Button>
+                    <Separator Height="25" Margin="25,0,25,0"/>
                     <Button Name="ResetCanvasBt" VerticalAlignment="Top" Click="ResetCanvasBt_Click">Reset canvas</Button>
+                    <Button Name="RunTestsBt" VerticalAlignment="Top" Click="RunTestsBt_Click">Run tests</Button>
                 </StackPanel>
             </Border> 
         </ScrollViewer>

@@ -8,6 +8,7 @@ namespace CG_Task3
     public class Polygon : I2DPrimitive
     {
         private List<System.Drawing.Point> _handlePoints;
+        private int _brushThickness = 1;
 
         #region Constructors
 
@@ -60,6 +61,39 @@ namespace CG_Task3
 
         public Color Color { get; set; }
 
+        public int BrushThickness
+        {
+            get 
+            {
+                return _brushThickness;
+            }
+            set
+            {
+                _brushThickness = value;
+                Pixels = CalculatePixels();
+            }
+        }
+
+        public List<DDALine> Edges
+        {
+            get
+            {
+                List<DDALine> lines = new();
+                for (int i = 0; i < _handlePoints.Count; i++)
+                {
+                    DDALine segment = new(_handlePoints.ElementAt(i), _handlePoints.ElementAt((i + 1) % _handlePoints.Count));
+                    lines.Add(segment);
+                }
+                return lines;
+            }
+        }
+
+        public Color Fill { get; set; }
+
+        public string FillImagePath { get; set; }
+
+        public Point CenterHandlePoint => Utils.CalculateCentroid(HandlePoints);
+
         #endregion
 
         #region Helpers
@@ -69,7 +103,7 @@ namespace CG_Task3
             List<System.Drawing.Point> newPointCollection = new();
             for(int i = 0; i < _handlePoints.Count; i++)
             {
-                DDALine segment = new(_handlePoints.ElementAt(i), _handlePoints.ElementAt((i + 1) % _handlePoints.Count));
+                DDALine segment = new(_handlePoints.ElementAt(i), _handlePoints.ElementAt((i + 1) % _handlePoints.Count), Color, BrushThickness);
                 newPointCollection = newPointCollection.Concat(segment.Pixels).ToList();
             }
             

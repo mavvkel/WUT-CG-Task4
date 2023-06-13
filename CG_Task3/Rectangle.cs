@@ -1,8 +1,9 @@
 ﻿using Newtonsoft.Json;
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System;
 
 namespace CG_Task3
 {
@@ -57,12 +58,52 @@ namespace CG_Task3
             }
             set
             {
-                _handlePoints = value;
+                if (1 == value.Where(point => !_handlePoints.Contains(point)).Count())
+                {
+                    Point newPoint = value.Where(point => !_handlePoints.Contains(point)).First();
+                    Point oldPoint = _handlePoints.Where(point => !value.Contains(point)).First();
+
+                    if (newPoint.X != oldPoint.X)
+                    {
+                        var changedPoints = _handlePoints.Where(point => point.X == oldPoint.X).ToList();
+                        int indexFirst = _handlePoints.IndexOf(changedPoints[0]);
+                        int indexSecond = _handlePoints.IndexOf(changedPoints[1]);
+                        _handlePoints.RemoveAt(indexFirst);
+                        _handlePoints.Insert(indexFirst, new(newPoint.X, changedPoints[0].Y));
+                        _handlePoints.RemoveAt(indexSecond);
+                        _handlePoints.Insert(indexSecond, new(newPoint.X, changedPoints[1].Y));
+                    }
+                    if (newPoint.Y != oldPoint.Y)
+                    {
+                        var changedPoints = _handlePoints.Where(point => point.Y == oldPoint.Y).ToList();
+                        int indexFirst = _handlePoints.IndexOf(changedPoints[0]);
+                        int indexSecond = _handlePoints.IndexOf(changedPoints[1]);
+                        _handlePoints.RemoveAt(indexFirst);
+                        _handlePoints.Insert(indexFirst, new(changedPoints[0].X, newPoint.Y));
+                        _handlePoints.RemoveAt(indexSecond);
+                        _handlePoints.Insert(indexSecond, new(changedPoints[1].X, newPoint.Y));
+                    }
+
+                }
+                else
+                    _handlePoints = value;
                 Pixels = CalculatePixels();
             }
         }
 
         public Color Color { get; set; }
+
+        public int BrushThickness
+        {
+            get
+            {
+                return 1;
+            }
+            set
+            { }
+        }
+
+        public Point CenterHandlePoint => Utils.CalculateCentroid(HandlePoints);
 
         #endregion
 
